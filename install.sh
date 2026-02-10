@@ -31,15 +31,11 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 
 # Detect operating system
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    OS_TYPE="macos"
-    echo -e "${GREEN}Detected: macOS${NC}"
-elif command -v apt-get &> /dev/null; then
-    OS_TYPE="linux"
-    echo -e "${GREEN}Detected: Debian/Ubuntu Linux${NC}"
+if command -v apt-get &> /dev/null; then
+    echo -e "${GREEN}✓ Detected: Debian/Ubuntu Linux${NC}"
 else
-    echo -e "${RED}Error: Unsupported operating system.${NC}"
-    echo -e "${RED}This installer supports: Debian/Ubuntu and macOS${NC}"
+    echo -e "${RED}✗ Error: Unsupported operating system${NC}"
+    echo -e "${RED}  This installer supports: Debian/Ubuntu Linux only${NC}"
     exit 1
 fi
 

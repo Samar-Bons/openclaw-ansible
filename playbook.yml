@@ -18,19 +18,23 @@
 
     - name: Detect operating system
       ansible.builtin.set_fact:
-        is_macos: "{{ ansible_os_family == 'Darwin' }}"
         is_linux: "{{ ansible_os_family == 'Debian' }}"
         is_debian: "{{ ansible_distribution in ['Debian', 'Ubuntu'] }}"
-        is_redhat: "{{ ansible_os_family == 'RedHat' }}"
+
+    - name: Fail on unsupported macOS
+      ansible.builtin.fail:
+        msg: >-
+          macOS bare-metal support has been deprecated and disabled.
+          Please use a Linux VM or container instead.
+          See README.md for details.
+      when: ansible_os_family == 'Darwin'
 
     - name: Display detected OS
       ansible.builtin.debug:
         msg: |
           Detected OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
           OS Family: {{ ansible_os_family }}
-          macOS: {{ is_macos }}
           Linux (Debian/Ubuntu): {{ is_debian }}
-          Linux (RedHat/CentOS): {{ is_redhat }}
 
     - name: Update apt cache and upgrade all packages (Debian/Ubuntu)
       ansible.builtin.apt:
@@ -71,35 +75,6 @@
       run_once: true
       changed_when: false
 
-    - name: Check if Homebrew is installed
-      ansible.builtin.stat:
-        path: "{{ '/opt/homebrew/bin/brew' if is_macos else '/home/linuxbrew/.linuxbrew/bin/brew' }}"
-      register: homebrew_check
-
-    - name: Install Homebrew (macOS and Linux)
-      ansible.builtin.shell: |
-        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-      args:
-        creates: "{{ '/opt/homebrew/bin/brew' if is_macos else '/home/linuxbrew/.linuxbrew/bin/brew' }}"
-      when: not homebrew_check.stat.exists
-      register: homebrew_install
-      become: false
-
-    - name: Add Homebrew to PATH for current session (Linux)
-      ansible.builtin.set_fact:
-        ansible_env: "{{ ansible_env | combine({'PATH': '/home/linuxbrew/.linuxbrew/bin:' + (ansible_env.PATH | default(lookup('env', 'PATH')))}) }}"
-      when: is_linux and not is_macos
-
-    - name: Add Homebrew to PATH for current session (macOS)
-      ansible.builtin.set_fact:
-        ansible_env: "{{ ansible_env | combine({'PATH': '/opt/homebrew/bin:' + (ansible_env.PATH | default(lookup('env', 'PATH')))}) }}"
-      when: is_macos
-
-    - name: Display Homebrew installation status
-      ansible.builtin.debug:
-        msg: "✅ Homebrew installed successfully"
-      when: homebrew_install is defined and homebrew_install.changed
-
   roles:
     - openclaw
 
@@ -133,7 +108,6 @@
           echo "Environment is configured:"
           echo "  ✓ XDG_RUNTIME_DIR: ${XDG_RUNTIME_DIR:-not set}"
           echo "  ✓ DBUS_SESSION_BUS_ADDRESS: ${DBUS_SESSION_BUS_ADDRESS:-not set}"
-          echo "  ✓ Homebrew: $(which brew 2>/dev/null || echo 'not found')"
           echo "  ✓ OpenClaw: $(openclaw --version 2>/dev/null || echo 'not found')"
           echo ""
           echo "────────────────────────────────────────────────────────"
