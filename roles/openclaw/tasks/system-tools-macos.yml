@@ -28,6 +28,7 @@
       - unzip
       - rsync
     state: present
+  become: false
   environment:
     # /opt/homebrew/bin is the default Homebrew prefix on Apple Silicon Macs
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"

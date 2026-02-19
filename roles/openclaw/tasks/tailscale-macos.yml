@@ -10,6 +10,7 @@
   community.general.homebrew_cask:
     name: tailscale
     state: present
+  become: false
   environment:
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   when: not tailscale_app_macos.stat.exists

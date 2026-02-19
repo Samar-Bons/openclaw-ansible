@@ -54,6 +54,7 @@
   community.general.homebrew:
     name: "node@{{ nodejs_version | regex_replace('\\.x$', '') }}"
     state: present
+  become: false
   environment:
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   when: ansible_os_family == 'Darwin'
@@ -61,6 +62,7 @@
 - name: Force-link Node.js into Homebrew prefix (macOS)
   ansible.builtin.command: >
     brew link --force --overwrite node@{{ nodejs_version | regex_replace('\.x$', '') }}
+  become: false
   environment:
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   when: ansible_os_family == 'Darwin'
