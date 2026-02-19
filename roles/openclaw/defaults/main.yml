@@ -6,7 +6,7 @@ ci_test: false
 
 # Tailscale settings
 # WARNING: Tasks using tailscale_authkey MUST set no_log: true to prevent credential exposure
-tailscale_enabled: false  # Set to true to install and configure Tailscale
+tailscale_enabled: true  # Tailscale is the primary remote access method for headless deployments
 tailscale_authkey: ""  # Optional: set to auto-connect during installation
 
 # Node.js version
