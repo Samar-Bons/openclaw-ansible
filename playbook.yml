@@ -18,22 +18,16 @@
 
     - name: Detect operating system
       ansible.builtin.set_fact:
+        is_macos: "{{ ansible_os_family == 'Darwin' }}"
         is_linux: "{{ ansible_os_family == 'Debian' }}"
         is_debian: "{{ ansible_distribution in ['Debian', 'Ubuntu'] }}"
-
-    - name: Fail on unsupported macOS
-      ansible.builtin.fail:
-        msg: >-
-          macOS bare-metal support has been deprecated and disabled.
-          Please use a Linux VM or container instead.
-          See README.md for details.
-      when: ansible_os_family == 'Darwin'
 
     - name: Display detected OS
       ansible.builtin.debug:
         msg: |
           Detected OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
           OS Family: {{ ansible_os_family }}
+          macOS: {{ is_macos }}
           Linux (Debian/Ubuntu): {{ is_debian }}
 
     - name: Update apt cache and upgrade all packages (Debian/Ubuntu)
@@ -54,6 +48,19 @@
         name: acl
         state: present
       when: is_linux
+
+    - name: Check Homebrew is installed (macOS)
+      ansible.builtin.stat:
+        path: /opt/homebrew/bin/brew
+      register: homebrew_check
+      when: is_macos
+
+    - name: Fail if Homebrew not installed (macOS)
+      ansible.builtin.fail:
+        msg: >-
+          Homebrew is required on macOS. Install it first:
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      when: is_macos and not homebrew_check.stat.exists
 
     - name: Check if running as root
       ansible.builtin.command: id -u
@@ -90,9 +97,9 @@
 
     - name: Create one-time welcome message for openclaw user
       ansible.builtin.copy:
-        dest: /home/openclaw/.openclaw-welcome
-        owner: openclaw
-        group: openclaw
+        dest: "{{ openclaw_home }}/.openclaw-welcome"
+        owner: "{{ openclaw_user }}"
+        group: "{{ 'staff' if is_macos else openclaw_user }}"
         mode: '0644'
         content: |
           echo ""
@@ -166,12 +173,21 @@
           # Remove welcome message (suppress errors if already deleted)
           rm -f "$HOME/.openclaw-welcome" 2>/dev/null || true
 
-    - name: Add welcome message to .bashrc
+    - name: Add welcome message to shell rc (Linux)
       ansible.builtin.lineinfile:
-        path: /home/openclaw/.bashrc
+        path: "{{ openclaw_home }}/.bashrc"
         line: '[ -f ~/.openclaw-welcome ] && source ~/.openclaw-welcome'
         state: present
         insertafter: EOF
+      when: not is_macos
+
+    - name: Add welcome message to shell rc (macOS)
+      ansible.builtin.lineinfile:
+        path: "{{ openclaw_home }}/.zshrc"
+        line: '[ -f ~/.openclaw-welcome ] && source ~/.openclaw-welcome'
+        state: present
+        insertafter: EOF
+      when: is_macos
 
     - name: Notify that playbook is complete
       ansible.builtin.debug:

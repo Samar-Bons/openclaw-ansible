@@ -2,20 +2,36 @@
 - name: Include system tools installation tasks
   ansible.builtin.include_tasks: system-tools.yml
 
-- name: Include Tailscale installation tasks
+- name: Include Tailscale installation tasks (Linux)
   ansible.builtin.include_tasks: tailscale-linux.yml
-  when: tailscale_enabled | bool
+  when: tailscale_enabled | bool and ansible_os_family == 'Debian'
+
+- name: Include Tailscale installation tasks (macOS)
+  ansible.builtin.include_tasks: tailscale-macos.yml
+  when: tailscale_enabled | bool and ansible_os_family == 'Darwin'
 
 - name: Include user creation tasks
   ansible.builtin.include_tasks: user.yml
 
-- name: Include Docker installation tasks
+- name: Include Docker installation tasks (Linux)
   ansible.builtin.include_tasks: docker-linux.yml
-  when: not ci_test
+  when: ansible_os_family == 'Debian' and not ci_test
 
-- name: Include firewall configuration tasks
+- name: Include Docker installation tasks (macOS)
+  ansible.builtin.include_tasks: docker-macos.yml
+  when: ansible_os_family == 'Darwin' and not ci_test and docker_enabled | default(false) | bool
+
+- name: Include firewall configuration tasks (Linux)
   ansible.builtin.include_tasks: firewall-linux.yml
-  when: not ci_test
+  when: ansible_os_family == 'Debian' and not ci_test
+
+- name: Include firewall configuration tasks (macOS)
+  ansible.builtin.include_tasks: firewall-macos.yml
+  when: ansible_os_family == 'Darwin' and not ci_test
+
+- name: Include macOS system hardening tasks
+  ansible.builtin.include_tasks: hardening-macos.yml
+  when: ansible_os_family == 'Darwin' and not ci_test
 
 - name: Include Node.js installation tasks
   ansible.builtin.include_tasks: nodejs.yml

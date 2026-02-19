@@ -1,23 +1,53 @@
 ---
-- name: Create openclaw system user
+# Linux: Create dedicated system user
+- name: Create openclaw system user (Linux)
   ansible.builtin.user:
-    name: openclaw
+    name: "{{ openclaw_user }}"
     comment: "OpenClaw Service User"
     system: true
     shell: /bin/bash
     create_home: true
-    home: /home/openclaw
+    home: "{{ openclaw_home }}"
     state: present
+  when: ansible_os_family == 'Debian'
 
+# macOS: Use existing user or create standard user
+# On dedicated Mac Minis, we typically use the primary admin account
+- name: Check if openclaw user exists (macOS)
+  ansible.builtin.command: id -u {{ openclaw_user }}
+  register: macos_user_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == 'Darwin'
+
+- name: Create openclaw user via sysadminctl (macOS)
+  ansible.builtin.command: >
+    sysadminctl -addUser {{ openclaw_user }}
+    -fullName "OpenClaw Service"
+    -password "{{ openclaw_macos_password | default('changeme') }}"
+    -home {{ openclaw_home }}
+    -shell /bin/zsh
+    -admin
+  when: ansible_os_family == 'Darwin' and macos_user_check.rc != 0
+  no_log: true
+
+- name: Set openclaw user facts (macOS - existing user)
+  ansible.builtin.set_fact:
+    openclaw_user: "{{ openclaw_macos_user | default(openclaw_user) }}"
+    openclaw_home: "{{ openclaw_macos_home | default('/Users/' + (openclaw_macos_user | default(openclaw_user))) }}"
+  when: ansible_os_family == 'Darwin'
+
+# Common: Ensure home directory
 - name: Ensure openclaw home directory has correct ownership
   ansible.builtin.file:
     path: "{{ openclaw_home }}"
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     state: directory
     mode: '0755'
 
-- name: Configure .bashrc for openclaw user
+# Linux: Configure .bashrc
+- name: Configure .bashrc for openclaw user (Linux)
   ansible.builtin.blockinfile:
     path: "{{ openclaw_home }}/.bashrc"
     marker: "# {mark} ANSIBLE MANAGED BLOCK - OpenClaw config"
@@ -40,10 +70,42 @@
       alias ll='ls -lah'
     create: true
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     mode: '0644'
+  when: ansible_os_family == 'Debian'
 
-- name: Add openclaw user to sudoers with scoped NOPASSWD
+# macOS: Configure .zshrc (zsh is default on macOS)
+- name: Configure .zshrc for openclaw user (macOS)
+  ansible.builtin.blockinfile:
+    path: "{{ openclaw_home }}/.zshrc"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - OpenClaw config"
+    block: |
+      # Enable 256 colors
+      export TERM=xterm-256color
+      export COLORTERM=truecolor
+
+      # Add Homebrew to PATH (Apple Silicon)
+      eval "$(/opt/homebrew/bin/brew shellenv)"
+
+      # Add pnpm to PATH
+      export PNPM_HOME="{{ openclaw_home }}/.local/share/pnpm"
+      export PATH="{{ openclaw_home }}/.local/bin:$PNPM_HOME:$PATH"
+
+      # Color support for common tools
+      export CLICOLOR=1
+      export LSCOLORS=ExFxCxDxBxegedabagacad
+
+      # Aliases
+      alias ls='ls -G'
+      alias grep='grep --color=auto'
+      alias ll='ls -lah'
+    create: true
+    owner: "{{ openclaw_user }}"
+    mode: '0644'
+  when: ansible_os_family == 'Darwin'
+
+# Linux: Scoped sudoers (systemctl + tailscale + journalctl)
+- name: Add openclaw user to sudoers with scoped NOPASSWD (Linux)
   ansible.builtin.copy:
     dest: /etc/sudoers.d/openclaw
     mode: '0440'
@@ -51,32 +113,13 @@
     group: root
     content: |
       # OpenClaw sudo permissions (scoped for security)
-      #
-      # SECURITY NOTE: These permissions are intentionally limited.
-      # If openclaw is compromised, attackers can only:
-      # - Manage the openclaw service
-      # - Run basic tailscale diagnostics
-      # - View openclaw logs
-      #
-      # To grant full tailscale control (e.g., for self-healing VPN):
-      #   openclaw ALL=(ALL) NOPASSWD: /usr/bin/tailscale *
-      #
-      # To grant full sudo (NOT RECOMMENDED):
-      #   openclaw ALL=(ALL) NOPASSWD: ALL
-
-      # Service control - openclaw service only
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/systemctl start openclaw
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop openclaw
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart openclaw
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/systemctl status openclaw
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable openclaw
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/systemctl disable openclaw
-      # daemon-reload affects all units (required after service file changes)
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/systemctl daemon-reload
-
-      # Tailscale - diagnostics + connect/disconnect
-      # NOTE: 'up' allows flags like --advertise-exit-node. For tighter control,
-      # remove 'up' and 'down' lines - operator must then manage VPN manually.
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/tailscale status
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/tailscale up *
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/tailscale down
@@ -84,17 +127,37 @@
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/tailscale version
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/tailscale ping *
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/tailscale whois *
-
-      # Journal access - openclaw logs only
       openclaw ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u openclaw *
     validate: /usr/sbin/visudo -cf %s
+  when: ansible_os_family == 'Debian'
 
-- name: Set openclaw user as primary user for installation
+# macOS: Scoped sudoers (launchctl + tailscale + firewall)
+- name: Add openclaw user to sudoers with scoped NOPASSWD (macOS)
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/openclaw
+    mode: '0440'
+    owner: root
+    group: wheel
+    content: |
+      # OpenClaw sudo permissions (scoped for security - macOS)
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /bin/launchctl load *
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /bin/launchctl unload *
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /bin/launchctl start *
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /bin/launchctl stop *
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /bin/launchctl list *
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /usr/libexec/ApplicationFirewall/socketfilterfw *
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /Applications/Tailscale.app/Contents/MacOS/Tailscale *
+    validate: /usr/sbin/visudo -cf %s
+  when: ansible_os_family == 'Darwin'
+
+# Linux: Set facts for user
+- name: Set openclaw user as primary user for installation (Linux)
   ansible.builtin.set_fact:
     openclaw_user: openclaw
     openclaw_home: /home/openclaw
+  when: ansible_os_family == 'Debian'
 
-- name: Create .bash_profile to source .bashrc for login shells
+- name: Create .bash_profile to source .bashrc for login shells (Linux)
   ansible.builtin.copy:
     dest: "{{ openclaw_home }}/.bash_profile"
     owner: "{{ openclaw_user }}"
@@ -102,12 +165,12 @@
     mode: '0644'
     content: |
       # .bash_profile - Executed for login shells
-      # Source .bashrc to ensure environment is loaded for login shells
       if [ -f ~/.bashrc ]; then
           . ~/.bashrc
       fi
+  when: ansible_os_family == 'Debian'
 
-# Fix DBus issues for systemd user services
+# Linux: Fix DBus issues for systemd user services
 - name: Get openclaw user ID
   ansible.builtin.command: id -u openclaw
   register: openclaw_uid
@@ -119,7 +182,7 @@
     msg: "OpenClaw user ID: {{ openclaw_uid.stdout }}"
   when: ansible_os_family == 'Debian' and not ci_test
 
-- name: Enable lingering for openclaw user (allows systemd user services without login)
+- name: Enable lingering for openclaw user
   ansible.builtin.command: loginctl enable-linger openclaw
   changed_when: false
   when: ansible_os_family == 'Debian' and not ci_test
@@ -138,18 +201,18 @@
     openclaw_uid_value: "{{ openclaw_uid.stdout }}"
   when: ansible_os_family == 'Debian' and not ci_test
 
-# SSH key configuration
+# Common: SSH key configuration
 - name: Create .ssh directory for openclaw user
   ansible.builtin.file:
     path: "{{ openclaw_home }}/.ssh"
     state: directory
-    owner: openclaw
-    group: openclaw
+    owner: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     mode: '0700'
 
 - name: Add SSH authorized keys for openclaw user
   ansible.posix.authorized_key:
-    user: openclaw
+    user: "{{ openclaw_user }}"
     state: present
     key: "{{ item }}"
   loop: "{{ openclaw_ssh_keys }}"
@@ -165,6 +228,7 @@
     msg: "No SSH keys configured. Set 'openclaw_ssh_keys' variable to allow SSH access."
   when: openclaw_ssh_keys | length == 0
 
+# Linux: XDG and DBus in .bashrc
 - name: Set XDG_RUNTIME_DIR in .bashrc for openclaw user
   ansible.builtin.lineinfile:
     path: /home/openclaw/.bashrc

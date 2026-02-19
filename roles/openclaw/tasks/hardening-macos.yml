@@ -1,0 +1,172 @@
+---
+# macOS-specific system hardening for dedicated OpenClaw Mac Minis
+# Equivalent of firewall-linux.yml + unattended-upgrades for macOS
+
+# Energy & Sleep Settings (headless server)
+- name: Prevent automatic sleeping
+  ansible.builtin.command: pmset -a sleep 0
+  become: true
+  changed_when: true
+
+- name: Prevent display sleep
+  ansible.builtin.command: pmset -a displaysleep 0
+  become: true
+  changed_when: true
+
+- name: Enable wake on network access
+  ansible.builtin.command: pmset -a womp 1
+  become: true
+  changed_when: true
+
+- name: Restart automatically after power failure
+  ansible.builtin.command: pmset -a autorestart 1
+  become: true
+  changed_when: true
+
+- name: Restart automatically if system freezes
+  ansible.builtin.command: pmset -a restartfreeze 1
+  become: true
+  changed_when: true
+
+# Disable unnecessary services
+- name: Disable AirDrop
+  ansible.builtin.command: defaults write com.apple.NetworkBrowser DisableAirDrop -bool YES
+  become: true
+  changed_when: true
+
+- name: Disable Bluetooth (headless server doesn't need it)
+  ansible.builtin.command: defaults write /Library/Preferences/com.apple.Bluetooth ControllerPowerState -int 0
+  become: true
+  changed_when: true
+  when: macos_disable_bluetooth | default(true) | bool
+
+# Remote Access
+- name: Enable SSH (Remote Login)
+  ansible.builtin.command: systemsetup -setremotelogin on
+  become: true
+  changed_when: true
+
+# Disable macOS auto-updates (BlueBubbles can break on API changes)
+- name: Disable automatic macOS updates
+  ansible.builtin.command: defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticDownload -bool false
+  become: true
+  changed_when: true
+
+- name: Disable automatic macOS install
+  ansible.builtin.command: defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticallyInstallMacOSUpdates -bool false
+  become: true
+  changed_when: true
+
+- name: Disable automatic app updates
+  ansible.builtin.command: defaults write /Library/Preferences/com.apple.commerce AutoUpdate -bool false
+  become: true
+  changed_when: true
+
+# Screen Sharing (VNC) for emergency access
+- name: Enable Screen Sharing
+  ansible.builtin.command: >
+    /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart
+    -activate -configure -access -on -restart -agent -privs -all
+  become: true
+  changed_when: true
+  when: macos_enable_screen_sharing | default(true) | bool
+
+# Automatic login (required for headless operation)
+- name: Enable automatic login for openclaw user
+  ansible.builtin.command: defaults write /Library/Preferences/com.apple.loginwindow autoLoginUser {{ openclaw_user }}
+  become: true
+  changed_when: true
+  when: macos_auto_login | default(true) | bool
+
+# FileVault (disk encryption)
+- name: Check FileVault status
+  ansible.builtin.command: fdesetup status
+  register: filevault_status
+  changed_when: false
+  become: true
+
+- name: Display FileVault status
+  ansible.builtin.debug:
+    msg: |
+      FileVault status: {{ filevault_status.stdout }}
+      ⚠️  If FileVault is not enabled, enable it manually:
+        sudo fdesetup enable
+      Save the recovery key securely (1Password recommended).
+  when: "'FileVault is Off' in filevault_status.stdout"
+
+# Keep Messages.app alive (critical for BlueBubbles)
+- name: Create Scripts directory
+  ansible.builtin.file:
+    path: "{{ openclaw_home }}/Scripts"
+    state: directory
+    owner: "{{ openclaw_user }}"
+    group: staff
+    mode: '0755'
+
+- name: Deploy poke-messages AppleScript
+  ansible.builtin.copy:
+    dest: "{{ openclaw_home }}/Scripts/poke-messages.scpt"
+    owner: "{{ openclaw_user }}"
+    group: staff
+    mode: '0644'
+    content: |
+      try
+        tell application "Messages"
+          if not running then
+            launch
+          end if
+          set _chatCount to (count of chats)
+        end tell
+      on error
+      end try
+
+- name: Deploy poke-messages LaunchAgent
+  ansible.builtin.copy:
+    dest: "{{ openclaw_home }}/Library/LaunchAgents/com.sigil.poke-messages.plist"
+    owner: "{{ openclaw_user }}"
+    group: staff
+    mode: '0644'
+    content: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+        <dict>
+          <key>Label</key>
+          <string>com.sigil.poke-messages</string>
+          <key>ProgramArguments</key>
+          <array>
+            <string>/bin/bash</string>
+            <string>-lc</string>
+            <string>/usr/bin/osascript "{{ openclaw_home }}/Scripts/poke-messages.scpt"</string>
+          </array>
+          <key>RunAtLoad</key>
+          <true/>
+          <key>StartInterval</key>
+          <integer>300</integer>
+          <key>StandardOutPath</key>
+          <string>/tmp/poke-messages.log</string>
+          <key>StandardErrorPath</key>
+          <string>/tmp/poke-messages.err</string>
+        </dict>
+      </plist>
+
+- name: Load poke-messages LaunchAgent
+  ansible.builtin.command: launchctl load {{ openclaw_home }}/Library/LaunchAgents/com.sigil.poke-messages.plist
+  become: true
+  become_user: "{{ openclaw_user }}"
+  changed_when: true
+  failed_when: false
+
+- name: Display macOS hardening summary
+  ansible.builtin.debug:
+    msg: |
+      ✅ macOS hardening applied:
+        • Sleep disabled, wake on network enabled
+        • Auto-restart on power failure enabled
+        • AirDrop disabled
+        • SSH enabled
+        • macOS auto-updates disabled (protect BlueBubbles)
+        • Messages.app keep-alive LaunchAgent installed
+        {{ '• Screen Sharing enabled' if macos_enable_screen_sharing | default(true) else '' }}
+        {{ '• Automatic login enabled for ' + openclaw_user if macos_auto_login | default(true) else '' }}
+        {{ '• Bluetooth disabled' if macos_disable_bluetooth | default(true) else '' }}

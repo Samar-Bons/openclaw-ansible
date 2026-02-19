@@ -18,9 +18,24 @@ openclaw_port: 3000
 # OpenClaw config directory
 openclaw_config_dir: "{{ openclaw_home }}/.openclaw"
 
-# User settings (will be created as system user)
+# User settings
+# Linux: creates a system user named 'openclaw' in /home/openclaw
+# macOS: uses openclaw_macos_user (defaults to 'openclaw') in /Users/<user>
 openclaw_user: openclaw
 openclaw_home: /home/openclaw
+
+# macOS-specific user settings
+# Set openclaw_macos_user to use an existing macOS account (e.g., your admin user)
+# instead of creating a new 'openclaw' user
+# openclaw_macos_user: "samar"
+# openclaw_macos_home: "/Users/samar"
+# openclaw_macos_password: ""  # Required only if creating a new user
+
+# macOS hardening settings
+macos_disable_bluetooth: true     # Disable Bluetooth (headless server)
+macos_enable_screen_sharing: true # Enable VNC for emergency access
+macos_auto_login: true            # Auto-login for headless operation
+docker_enabled: false             # Docker not needed for typical macOS deployments
 
 # Installation mode: 'release' or 'development'
 # release: Install via pnpm install -g openclaw@latest
