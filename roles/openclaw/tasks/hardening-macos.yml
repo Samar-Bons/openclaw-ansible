@@ -31,6 +31,13 @@
   ansible.builtin.command: pmset -a restartfreeze 1
   become: true
   changed_when: true
+  failed_when: false
+  register: restartfreeze_result
+
+- name: Note if restartfreeze is unsupported
+  ansible.builtin.debug:
+    msg: "pmset restartfreeze not supported on this macOS version (skipped)"
+  when: restartfreeze_result.rc != 0
 
 # Disable unnecessary services
 - name: Disable AirDrop
