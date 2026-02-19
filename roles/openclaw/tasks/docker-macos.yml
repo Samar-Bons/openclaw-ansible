@@ -14,12 +14,6 @@
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   when: not docker_desktop.stat.exists
 
-- name: Wait for Docker Desktop to be available (macOS)
-  ansible.builtin.wait_for:
-    path: /var/run/docker.sock
-    timeout: 120
-  when: not docker_desktop.stat.exists
-
 - name: Display Docker Desktop installation note (macOS)
   ansible.builtin.debug:
     msg: |

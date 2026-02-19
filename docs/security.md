@@ -193,4 +193,4 @@ After installation, verify:
 
 If you discover a security vulnerability, please report it privately:
 - OpenClaw: https://github.com/openclaw/openclaw/security
-- This installer: https://github.com/openclaw/openclaw-ansible/security
+- This installer: https://github.com/Samar-Bons/openclaw-ansible/security

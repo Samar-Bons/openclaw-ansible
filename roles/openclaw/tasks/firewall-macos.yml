@@ -20,12 +20,13 @@
 
 - name: Enable macOS Application Firewall (if disabled)
   ansible.builtin.command: /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
-  when: "'disabled' in macos_firewall_status.stdout.lower()"
+  when: "'disabled' in (macos_firewall_status.stdout | lower)"
   become: true
   changed_when: true
 
 - name: Allow Tailscale through firewall
-  ansible.builtin.command: /usr/libexec/ApplicationFirewall/socketfilterfw --add /Applications/Tailscale.app
+  ansible.builtin.command: /usr/libexec/ApplicationFirewall/socketfilterfw --add /Applications/Tailscale.app/Contents/MacOS/Tailscale
+  when: tailscale_enabled | default(false) | bool
   failed_when: false
   become: true
   changed_when: false

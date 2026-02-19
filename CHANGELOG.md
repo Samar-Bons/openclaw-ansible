@@ -153,7 +153,7 @@ openclaw onboard --install-daemon # ✅ One command setup!
 #### New Workflow - Development Mode
 ```bash
 # Installation with development mode
-git clone https://github.com/openclaw/openclaw-ansible.git
+git clone https://github.com/Samar-Bons/openclaw-ansible.git
 cd openclaw-ansible
 ./run-playbook.sh -e openclaw_install_mode=development
 

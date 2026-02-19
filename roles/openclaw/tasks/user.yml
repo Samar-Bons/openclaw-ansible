@@ -20,11 +20,22 @@
   failed_when: false
   when: ansible_os_family == 'Darwin'
 
+- name: Require password when creating a new macOS user
+  ansible.builtin.assert:
+    that:
+      - openclaw_macos_password is defined
+      - openclaw_macos_password | length > 0
+    fail_msg: >
+      openclaw_macos_password must be set when creating a new macOS user.
+      Pass it via: -e openclaw_macos_password='YourSecurePassword'
+    success_msg: "macOS user password is set"
+  when: ansible_os_family == 'Darwin' and macos_user_check.rc != 0
+
 - name: Create openclaw user via sysadminctl (macOS)
   ansible.builtin.command: >
     sysadminctl -addUser {{ openclaw_user }}
     -fullName "OpenClaw Service"
-    -password "{{ openclaw_macos_password | default('changeme') }}"
+    -password "{{ openclaw_macos_password }}"
     -home {{ openclaw_home }}
     -shell /bin/zsh
     -admin
@@ -101,6 +112,7 @@
       alias ll='ls -lah'
     create: true
     owner: "{{ openclaw_user }}"
+    group: staff
     mode: '0644'
   when: ansible_os_family == 'Darwin'
 

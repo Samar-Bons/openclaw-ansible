@@ -1,23 +1,11 @@
 # OpenClaw Ansible Installer
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Lint](https://github.com/openclaw/openclaw-ansible/actions/workflows/lint.yml/badge.svg)](https://github.com/openclaw/openclaw-ansible/actions/workflows/lint.yml)
+[![Lint](https://github.com/Samar-Bons/openclaw-ansible/actions/workflows/lint.yml/badge.svg)](https://github.com/Samar-Bons/openclaw-ansible/actions/workflows/lint.yml)
 [![Ansible](https://img.shields.io/badge/Ansible-2.14+-blue.svg)](https://www.ansible.com/)
-[![Multi-OS](https://img.shields.io/badge/OS-Debian%20%7C%20Ubuntu-orange.svg)](https://www.debian.org/)
+[![Multi-OS](https://img.shields.io/badge/OS-Debian%20%7C%20Ubuntu%20%7C%20macOS-orange.svg)](https://www.debian.org/)
 
-Automated, hardened installation of [OpenClaw](https://github.com/openclaw/openclaw) with Docker and Tailscale VPN support for Debian/Ubuntu Linux.
-
-## ⚠️ macOS Support: Deprecated & Disabled
-
-**Effective 2026-02-06, support for bare-metal macOS installations has been removed from this playbook.**
-
-### Why?
-The underlying project currently requires system-level permissions and configurations that introduce significant security risks when executed on a primary host OS. To protect user data and system integrity, we have disabled bare-metal execution.
-
-### What does this mean?
-* The playbook will now explicitly fail if run on a `Darwin` (macOS) system.
-* We strongly discourage manual workarounds to bypass this check.
-* **Future Support:** We are evaluating a virtualization-first strategy (using Vagrant or Docker) to provide a sandboxed environment for this project in the future.
+Automated, hardened installation of [OpenClaw](https://github.com/openclaw/openclaw) with Docker and Tailscale VPN support for Debian/Ubuntu Linux and macOS.
 
 ## Features
 
@@ -32,13 +20,23 @@ The underlying project currently requires system-level permissions and configura
 
 ## Quick Start
 
-### Release Mode (Recommended)
+### Release Mode — Linux (Recommended)
 
 Install the latest stable version from npm:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/openclaw/openclaw-ansible/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Samar-Bons/openclaw-ansible/main/install.sh | bash
 ```
+
+### Release Mode — macOS
+
+The one-liner also works on macOS. It auto-detects your current user:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Samar-Bons/openclaw-ansible/main/install.sh | bash
+```
+
+To use a different macOS user: `OPENCLAW_MACOS_USER=otheruser curl ... | bash`
 
 ### Development Mode
 
@@ -46,21 +44,34 @@ Install from source for development or testing:
 
 ```bash
 # Clone the installer
-git clone https://github.com/openclaw/openclaw-ansible.git
+git clone https://github.com/Samar-Bons/openclaw-ansible.git
 cd openclaw-ansible
 
 # Install in development mode
 ansible-playbook playbook.yml --ask-become-pass -e openclaw_install_mode=development
 ```
 
+### macOS Quick Start
+
+For dedicated Mac Minis (headless deployment):
+
+```bash
+git clone https://github.com/Samar-Bons/openclaw-ansible.git
+cd openclaw-ansible
+ansible-galaxy collection install -r requirements.yml
+ansible-playbook playbook.yml --ask-become-pass \
+  -e openclaw_macos_user=$(whoami) \
+  -e openclaw_macos_password='YourPassword'
+```
+
 ## What Gets Installed
 
 - Tailscale (mesh VPN)
-- UFW firewall (SSH + Tailscale ports only)
-- Docker CE + Compose V2 (for sandboxes)
+- UFW firewall (Linux) / Application Firewall (macOS)
+- Docker CE + Compose V2 (Linux) / Docker Desktop (macOS, optional)
 - Node.js 22.x + pnpm
 - OpenClaw on host (not containerized)
-- Systemd service (auto-start)
+- Systemd service (Linux) / LaunchAgent (macOS)
 
 ## Post-Install
 
@@ -131,6 +142,8 @@ Enable with: `-e openclaw_install_mode=development`
 - **Non-root**: OpenClaw runs as unprivileged user
 - **Scoped sudo**: Limited to service management (not full root)
 - **Systemd hardening**: NoNewPrivileges, PrivateTmp, ProtectSystem
+- **macOS Application Firewall**: Enabled with Tailscale allowed
+- **macOS hardening**: Sleep disabled, auto-updates disabled, Screen Sharing scoped to service user
 
 Verify: `nmap -p- YOUR_SERVER_IP` should show only port 22 open.
 
@@ -139,7 +152,7 @@ Verify: `nmap -p- YOUR_SERVER_IP` should show only port 22 open.
 For high-security environments, audit before running:
 
 ```bash
-git clone https://github.com/openclaw/openclaw-ansible.git
+git clone https://github.com/Samar-Bons/openclaw-ansible.git
 cd openclaw-ansible
 # Review playbook.yml and roles/
 ansible-playbook playbook.yml --check --diff  # Dry run
@@ -157,18 +170,18 @@ ansible-playbook playbook.yml --ask-become-pass
 
 ## Requirements
 
-- Debian 11+ or Ubuntu 20.04+
+- Debian 11+ or Ubuntu 20.04+ or macOS 13+ (Apple Silicon)
 - Root/sudo access
 - Internet connection
 
 ## What Gets Installed
 
 - Tailscale (mesh VPN)
-- UFW firewall (SSH + Tailscale ports only)
-- Docker CE + Compose V2 (for sandboxes)
+- UFW firewall (Linux) / Application Firewall (macOS)
+- Docker CE + Compose V2 (Linux) / Docker Desktop (macOS, optional)
 - Node.js 22.x + pnpm
 - OpenClaw on host (not containerized)
-- Systemd service (auto-start)
+- Systemd service (Linux) / LaunchAgent (macOS)
 
 ## Manual Installation
 
@@ -179,7 +192,7 @@ ansible-playbook playbook.yml --ask-become-pass
 sudo apt update && sudo apt install -y ansible git
 
 # Clone repository
-git clone https://github.com/openclaw/openclaw-ansible.git
+git clone https://github.com/Samar-Bons/openclaw-ansible.git
 cd openclaw-ansible
 
 # Install Ansible collections
@@ -255,6 +268,12 @@ Edit `roles/openclaw/defaults/main.yml` before running the playbook.
 | `openclaw_repo_branch` | `main` | Git branch (dev mode) |
 | `tailscale_authkey` | `""` | Tailscale auth key for auto-connect |
 | `nodejs_version` | `22.x` | Node.js version to install |
+| `openclaw_macos_user` | (unset) | Use existing macOS account instead of creating new user |
+| `openclaw_macos_password` | (unset) | Required when creating a new macOS user |
+| `macos_disable_bluetooth` | `true` | Disable Bluetooth on headless Mac |
+| `macos_enable_screen_sharing` | `true` | Enable VNC for emergency access |
+| `macos_auto_login` | `true` | Auto-login for headless operation |
+| `docker_enabled` | `false` | Install Docker Desktop on macOS |
 
 See [`roles/openclaw/defaults/main.yml`](roles/openclaw/defaults/main.yml) for the complete list.
 
@@ -290,4 +309,4 @@ MIT - see [LICENSE](LICENSE)
 ## Support
 
 - OpenClaw: https://github.com/openclaw/openclaw
-- This installer: https://github.com/openclaw/openclaw-ansible/issues
+- This installer: https://github.com/Samar-Bons/openclaw-ansible/issues

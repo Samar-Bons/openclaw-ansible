@@ -29,7 +29,7 @@ openclaw_home: /home/openclaw
 # instead of creating a new 'openclaw' user
 # openclaw_macos_user: "samar"
 # openclaw_macos_home: "/Users/samar"
-# openclaw_macos_password: ""  # Required only if creating a new user
+# openclaw_macos_password: ""  # REQUIRED when creating a new user (no default, playbook will fail without it)
 
 # macOS hardening settings
 macos_disable_bluetooth: true     # Disable Bluetooth (headless server)

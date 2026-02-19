@@ -6,7 +6,7 @@
     path: "{{ openclaw_code_dir }}"
     state: directory
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     mode: '0755'
 
 - name: Check if openclaw repository already exists
@@ -44,7 +44,7 @@
   ansible.builtin.shell:
     cmd: pnpm install
     chdir: "{{ openclaw_repo_dir }}"
-    executable: /bin/bash
+    executable: "{{ '/bin/zsh' if ansible_os_family == 'Darwin' else '/bin/bash' }}"
   become: true
   become_user: "{{ openclaw_user }}"
   environment:
@@ -58,7 +58,7 @@
   ansible.builtin.shell:
     cmd: pnpm build
     chdir: "{{ openclaw_repo_dir }}"
-    executable: /bin/bash
+    executable: "{{ '/bin/zsh' if ansible_os_family == 'Darwin' else '/bin/bash' }}"
   become: true
   become_user: "{{ openclaw_user }}"
   environment:
@@ -94,7 +94,7 @@
     dest: "{{ openclaw_home }}/.local/bin/openclaw"
     state: link
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     force: true
 
 - name: Make openclaw binary executable
@@ -102,7 +102,7 @@
     path: "{{ openclaw_repo_dir }}/bin/openclaw.js"
     mode: '0755'
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
 
 - name: Verify openclaw installation from development build
   ansible.builtin.shell:
@@ -138,5 +138,24 @@
       alias openclaw-pull='cd {{ openclaw_repo_dir }} && git pull && pnpm install && pnpm build'
     create: true
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     mode: '0644'
+  when: ansible_os_family == 'Debian'
+
+- name: Add development mode info to .zshrc (macOS)
+  ansible.builtin.blockinfile:
+    path: "{{ openclaw_home }}/.zshrc"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - OpenClaw development"
+    block: |
+      # OpenClaw development mode
+      export OPENCLAW_DEV_DIR="{{ openclaw_repo_dir }}"
+
+      # Aliases for development
+      alias openclaw-rebuild='cd {{ openclaw_repo_dir }} && pnpm build'
+      alias openclaw-dev='cd {{ openclaw_repo_dir }}'
+      alias openclaw-pull='cd {{ openclaw_repo_dir }} && git pull && pnpm install && pnpm build'
+    create: true
+    owner: "{{ openclaw_user }}"
+    group: staff
+    mode: '0644'
+  when: ansible_os_family == 'Darwin'

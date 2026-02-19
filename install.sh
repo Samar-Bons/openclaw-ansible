@@ -12,7 +12,7 @@ if [ -z "$COLORTERM" ]; then
     export COLORTERM=truecolor
 fi
 
-REPO_URL="https://raw.githubusercontent.com/openclaw/openclaw-ansible/main"
+REPO_URL="https://raw.githubusercontent.com/Samar-Bons/openclaw-ansible/main"
 PLAYBOOK_URL="${REPO_URL}/playbook.yml"
 TEMP_DIR=$(mktemp -d)
 
@@ -31,16 +31,38 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 
 # Detect operating system
-if command -v apt-get &> /dev/null; then
+OS_TYPE="unknown"
+if [ "$(uname -s)" = "Darwin" ]; then
+    OS_TYPE="macos"
+    echo -e "${GREEN}✓ Detected: macOS${NC}"
+    if ! command -v brew &> /dev/null; then
+        echo -e "${RED}✗ Error: Homebrew is required on macOS${NC}"
+        echo -e "${RED}  Install it from https://brew.sh${NC}"
+        exit 1
+    fi
+elif command -v apt-get &> /dev/null; then
+    OS_TYPE="linux"
     echo -e "${GREEN}✓ Detected: Debian/Ubuntu Linux${NC}"
 else
     echo -e "${RED}✗ Error: Unsupported operating system${NC}"
-    echo -e "${RED}  This installer supports: Debian/Ubuntu Linux only${NC}"
+    echo -e "${RED}  Supported: Debian/Ubuntu, macOS${NC}"
     exit 1
 fi
 
+# macOS: detect current user and set extra vars for the playbook
+MACOS_EXTRA_VARS=""
+if [ "$OS_TYPE" = "macos" ]; then
+    MACOS_USER="${OPENCLAW_MACOS_USER:-$(whoami)}"
+    echo -e "${CYAN}macOS user: ${MACOS_USER}${NC}"
+    echo -e "${CYAN}  (override with OPENCLAW_MACOS_USER env var)${NC}"
+    MACOS_EXTRA_VARS="-e openclaw_macos_user=${MACOS_USER}"
+fi
+
 # Check if running as root or with sudo access
-if [ "$EUID" -eq 0 ]; then
+if [ "$OS_TYPE" = "macos" ]; then
+    SUDO="sudo"
+    ANSIBLE_EXTRA_VARS="--ask-become-pass ${MACOS_EXTRA_VARS}"
+elif [ "$EUID" -eq 0 ]; then
     echo -e "${GREEN}Running as root.${NC}"
     SUDO=""
     ANSIBLE_EXTRA_VARS="-e ansible_become=false"
@@ -58,8 +80,12 @@ echo -e "${GREEN}[1/4] Checking prerequisites...${NC}"
 # Check if Ansible is installed
 if ! command -v ansible-playbook &> /dev/null; then
     echo -e "${YELLOW}Ansible not found. Installing...${NC}"
-    $SUDO apt-get update -qq
-    $SUDO apt-get install -y ansible
+    if [ "$OS_TYPE" = "macos" ]; then
+        brew install ansible
+    else
+        $SUDO apt-get update -qq
+        $SUDO apt-get install -y ansible
+    fi
     echo -e "${GREEN}✓ Ansible installed${NC}"
 else
     echo -e "${GREEN}✓ Ansible already installed${NC}"
@@ -72,7 +98,7 @@ cd "$TEMP_DIR"
 
 # For simplicity, we'll clone the entire repo
 echo "Cloning repository..."
-git clone https://github.com/openclaw/openclaw-ansible.git
+git clone https://github.com/Samar-Bons/openclaw-ansible.git
 cd openclaw-ansible
 
 echo -e "${GREEN}✓ Playbook downloaded${NC}"

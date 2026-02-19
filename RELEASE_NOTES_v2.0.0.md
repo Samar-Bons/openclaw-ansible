@@ -57,12 +57,12 @@ All issues from user feedback resolved:
 
 #### Quick Start (Release Mode)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/openclaw/openclaw-ansible/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Samar-Bons/openclaw-ansible/main/install.sh | bash
 ```
 
 #### Development Mode
 ```bash
-git clone https://github.com/openclaw/openclaw-ansible.git
+git clone https://github.com/Samar-Bons/openclaw-ansible.git
 cd openclaw-ansible
 ./run-playbook.sh -e openclaw_install_mode=development
 ```
@@ -115,4 +115,4 @@ Special thanks to early adopters who provided feedback on the DBus and user swit
 
 ---
 
-**Full Changelog**: https://github.com/openclaw/openclaw-ansible/blob/main/CHANGELOG.md
+**Full Changelog**: https://github.com/Samar-Bons/openclaw-ansible/blob/main/CHANGELOG.md

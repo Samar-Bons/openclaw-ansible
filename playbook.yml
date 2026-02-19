@@ -1,5 +1,5 @@
 ---
-- name: Install OpenClaw with Docker and UFW firewall
+- name: Install and configure OpenClaw
   hosts: localhost
   connection: local
   become: true

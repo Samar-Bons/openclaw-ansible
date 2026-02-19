@@ -58,6 +58,14 @@
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   when: ansible_os_family == 'Darwin'
 
+- name: Force-link Node.js into Homebrew prefix (macOS)
+  ansible.builtin.command: >
+    brew link --force --overwrite node@{{ nodejs_version | regex_replace('\.x$', '') }}
+  environment:
+    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
+  when: ansible_os_family == 'Darwin'
+  changed_when: true
+
 # Common: pnpm installation
 - name: Check if pnpm is already installed
   ansible.builtin.command: pnpm --version

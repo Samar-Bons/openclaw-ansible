@@ -11,7 +11,7 @@
     path: "{{ item.path }}"
     state: directory
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     mode: "{{ item.mode }}"
   loop:
     - { path: "{{ openclaw_config_dir }}", mode: '0755' }
@@ -25,7 +25,7 @@
     path: "{{ item }}"
     state: directory
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     mode: '0755'
   loop:
     - "{{ openclaw_home }}/.local/share/pnpm"
@@ -37,7 +37,7 @@
     path: "{{ openclaw_home }}/.local/share/pnpm"
     state: directory
     owner: "{{ openclaw_user }}"
-    group: "{{ openclaw_user }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else openclaw_user }}"
     recurse: true
     mode: '0755'
 
@@ -56,7 +56,7 @@
         CHANGED=1
       fi
       exit $CHANGED
-    executable: /bin/bash
+    executable: "{{ '/bin/zsh' if ansible_os_family == 'Darwin' else '/bin/bash' }}"
   become: true
   become_user: "{{ openclaw_user }}"
   register: pnpm_config_result
@@ -89,6 +89,22 @@
     group: "{{ openclaw_user }}"
     mode: '0644'
     insertafter: EOF
+  when: ansible_os_family == 'Debian'
+
+- name: Configure .zshrc for openclaw user pnpm PATH (macOS)
+  ansible.builtin.blockinfile:
+    path: "{{ openclaw_home }}/.zshrc"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - OpenClaw pnpm"
+    block: |
+      # pnpm configuration
+      export PNPM_HOME="{{ openclaw_home }}/.local/share/pnpm"
+      export PATH="{{ openclaw_home }}/.local/bin:$PNPM_HOME:$PATH"
+    create: true
+    owner: "{{ openclaw_user }}"
+    group: staff
+    mode: '0644'
+    insertafter: EOF
+  when: ansible_os_family == 'Darwin'
 
 # NOTE: We do NOT create config.yml here - openclaw onboard/configure will do that
 # We also do NOT install the systemd service - openclaw onboard --install-daemon will do that

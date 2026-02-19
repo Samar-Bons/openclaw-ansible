@@ -27,16 +27,26 @@ LOBSTER
 
 echo ""
 echo "🔒 Security Status:"
-echo "  - UFW Firewall: ENABLED"
 {% endraw %}
+{% if ansible_os_family == 'Darwin' %}
+echo "  - macOS Application Firewall: ENABLED"
+{% else %}
+echo "  - UFW Firewall: ENABLED"
+{% endif %}
 {% if tailscale_enabled | default(false) %}
 echo "  - Open Ports: SSH (22) + Tailscale (41641/udp)"
 {% else %}
 echo "  - Open Ports: SSH (22)"
 {% endif %}
+{% if ansible_os_family == 'Darwin' %}
+echo "  - Docker Desktop: {{ 'INSTALLED' if docker_enabled | default(false) else 'NOT INSTALLED' }}"
+{% else %}
 {% raw %}
 echo "  - Docker isolation: ACTIVE"
+{% endraw %}
+{% endif %}
+{% raw %}
 echo ""
-echo "📚 Documentation: https://github.com/openclaw/openclaw-ansible"
+echo "📚 Documentation: https://github.com/Samar-Bons/openclaw-ansible"
 echo ""
 {% endraw %}

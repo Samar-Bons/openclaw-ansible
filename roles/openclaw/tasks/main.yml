@@ -1,4 +1,10 @@
 ---
+- name: Set macOS user facts early (before any task files reference them)
+  ansible.builtin.set_fact:
+    openclaw_user: "{{ openclaw_macos_user | default(openclaw_user) }}"
+    openclaw_home: "{{ openclaw_macos_home | default('/Users/' + (openclaw_macos_user | default(openclaw_user))) }}"
+  when: ansible_os_family == 'Darwin'
+
 - name: Include system tools installation tasks
   ansible.builtin.include_tasks: system-tools.yml
 
