@@ -47,23 +47,31 @@
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   when: tailscale_formula_check.rc != 0
 
-- name: Start tailscaled as a system service (sudo for privileged daemon)
-  ansible.builtin.command: sudo /opt/homebrew/bin/brew services start tailscale
-  become: false
-  environment:
-    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
-  changed_when: true
-  failed_when: false
+- name: Ensure tailscaled state directory exists
+  ansible.builtin.file:
+    path: /var/lib/tailscale
+    state: directory
+    mode: "0755"
+  become: true
 
-- name: Fallback — start tailscaled directly if brew services failed
+- name: Ensure tailscaled socket directory exists
+  ansible.builtin.file:
+    path: /var/run/tailscale
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Start tailscaled daemon
   ansible.builtin.shell: |
     if ! pgrep -x tailscaled > /dev/null; then
-      sudo /opt/homebrew/bin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+      nohup /opt/homebrew/bin/tailscaled \
+        --state=/var/lib/tailscale/tailscaled.state \
+        --socket=/var/run/tailscale/tailscaled.sock \
+        > /var/log/tailscaled.log 2>&1 &
       sleep 3
     fi
-  become: false
+  become: true
   changed_when: true
-  failed_when: false
 
 - name: Wait for tailscaled to be ready
   ansible.builtin.command: tailscale status --json
