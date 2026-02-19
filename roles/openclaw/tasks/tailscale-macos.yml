@@ -62,8 +62,8 @@
   register: tailscale_status_macos
   changed_when: false
   failed_when: false
-  retries: 5
-  delay: 2
+  retries: 10
+  delay: 3
   until: tailscale_status_macos.rc == 0
 
 - name: Connect to Tailnet with auth key (unattended)
@@ -79,13 +79,34 @@
   no_log: true
   changed_when: true
 
-- name: Enable Tailscale SSH (if already connected without auth key)
-  ansible.builtin.command: tailscale set --ssh
+- name: Connect to Tailnet interactively (no auth key)
+  ansible.builtin.command: tailscale up --ssh
   environment:
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   become: true
+  register: tailscale_up_result
   changed_when: true
   failed_when: false
+  when: tailscale_authkey | length == 0
+
+- name: Display manual Tailscale login instructions
+  ansible.builtin.debug:
+    msg:
+      - "============================================"
+      - "⚠️  Manual Tailscale login required"
+      - "============================================"
+      - ""
+      - "tailscaled is running but not yet connected to your Tailnet."
+      - ""
+      - "After the playbook finishes, run:"
+      - "  sudo tailscale up --ssh"
+      - ""
+      - "It will print a login URL. Open it in your browser to authenticate."
+      - "Once connected, verify with: tailscale status"
+      - ""
+      - "For future deployments, generate an auth key at:"
+      - "  https://login.tailscale.com/admin/settings/keys"
+      - "Then pass it as: -e tailscale_authkey=tskey-auth-xxxxx"
   when: tailscale_authkey | length == 0
 
 - name: Display Tailscale setup instructions

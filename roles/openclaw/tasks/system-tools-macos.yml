@@ -1,6 +1,20 @@
 ---
 # macOS-specific system tools installation (Homebrew-based)
 
+# Homebrew cask installs (.pkg-based apps like Tailscale, Docker Desktop) internally
+# call `sudo installer -pkg ...`. Since brew itself refuses to run as root, we use
+# become: false on all brew tasks — but that means brew's internal sudo has no
+# password/terminal. This sudoers rule allows passwordless /usr/sbin/installer
+# so cask installs work unattended.
+- name: Allow passwordless pkg installer for Homebrew cask installs (macOS)
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/homebrew-cask
+    content: |
+      {{ openclaw_user }} ALL=(root) NOPASSWD: /usr/sbin/installer
+    mode: '0440'
+    validate: visudo -cf %s
+  become: true
+
 - name: Install essential system tools (macOS - Homebrew)
   community.general.homebrew:
     name:
