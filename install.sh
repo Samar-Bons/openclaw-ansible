@@ -56,6 +56,7 @@ fi
 
 # macOS: detect current user and set extra vars for the playbook
 MACOS_EXTRA_VARS=""
+TAILSCALE_EXTRA_VARS=""
 if [ "$OS_TYPE" = "macos" ]; then
     MACOS_USER="${OPENCLAW_MACOS_USER:-$(whoami)}"
     echo -e "${CYAN}macOS user: ${MACOS_USER}${NC}"
@@ -63,21 +64,32 @@ if [ "$OS_TYPE" = "macos" ]; then
     MACOS_EXTRA_VARS="-e openclaw_macos_user=${MACOS_USER}"
 fi
 
+# Tailscale auth key (optional — enables zero-touch Tailnet join)
+if [ -n "$TAILSCALE_AUTHKEY" ]; then
+    echo -e "${GREEN}✓ Tailscale auth key provided${NC}"
+    TAILSCALE_EXTRA_VARS="-e tailscale_authkey=${TAILSCALE_AUTHKEY}"
+fi
+
+# Tailscale hostname (optional)
+if [ -n "$TAILSCALE_HOSTNAME" ]; then
+    TAILSCALE_EXTRA_VARS="${TAILSCALE_EXTRA_VARS} -e tailscale_hostname=${TAILSCALE_HOSTNAME}"
+fi
+
 # Check if running as root or with sudo access
 if [ "$OS_TYPE" = "macos" ]; then
     SUDO="sudo"
-    ANSIBLE_EXTRA_VARS="--ask-become-pass ${MACOS_EXTRA_VARS}"
+    ANSIBLE_EXTRA_VARS="--ask-become-pass ${MACOS_EXTRA_VARS} ${TAILSCALE_EXTRA_VARS}"
 elif [ "$EUID" -eq 0 ]; then
     echo -e "${GREEN}Running as root.${NC}"
     SUDO=""
-    ANSIBLE_EXTRA_VARS="-e ansible_become=false"
+    ANSIBLE_EXTRA_VARS="-e ansible_become=false ${TAILSCALE_EXTRA_VARS}"
 else
     if ! command -v sudo &> /dev/null; then
         echo -e "${RED}Error: sudo is not installed. Please install sudo or run as root.${NC}"
         exit 1
     fi
     SUDO="sudo"
-    ANSIBLE_EXTRA_VARS="--ask-become-pass"
+    ANSIBLE_EXTRA_VARS="--ask-become-pass ${TAILSCALE_EXTRA_VARS}"
 fi
 
 echo -e "${GREEN}[1/5] Checking prerequisites...${NC}"
