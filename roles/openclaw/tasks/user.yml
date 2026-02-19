@@ -110,6 +110,9 @@
       alias ls='ls -G'
       alias grep='grep --color=auto'
       alias ll='ls -lah'
+
+      # Tailscale (open-source tailscaled uses non-default socket)
+      alias tailscale='tailscale --socket=/var/run/tailscale/tailscaled.sock'
     create: true
     owner: "{{ openclaw_user }}"
     group: staff
