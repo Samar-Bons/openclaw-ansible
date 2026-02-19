@@ -156,6 +156,14 @@
       on error
       end try
 
+- name: Ensure Library/LaunchAgents directory exists
+  ansible.builtin.file:
+    path: "{{ openclaw_home }}/Library/LaunchAgents"
+    state: directory
+    owner: "{{ openclaw_user }}"
+    group: staff
+    mode: '0755'
+
 - name: Ensure Library/Logs directory exists
   ansible.builtin.file:
     path: "{{ openclaw_home }}/Library/Logs"
