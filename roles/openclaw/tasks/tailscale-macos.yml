@@ -1,44 +1,116 @@
 ---
-# macOS-specific Tailscale installation (Homebrew Cask)
+# macOS-specific Tailscale installation (open-source tailscaled via Homebrew formula)
+#
+# We use the open-source `tailscaled` variant (brew install --formula tailscale)
+# instead of the GUI app (brew install --cask tailscale) because:
+#   1. Tailscale SSH server — only available with tailscaled (zero-config SSH, no key management)
+#   2. Tailscale Funnel — only available with tailscaled (stable public URLs for Twilio webhooks)
+#   3. Runs before login — critical for headless Mac Minis after power outage
+#   4. No GUI needed — these are headless servers
+#
+# Source: https://tailscale.com/kb/1065/macos-variants (comparison table)
+# Source: https://github.com/tailscale/tailscale/wiki/Tailscaled-on-macOS
 
-- name: Check if Tailscale is already installed (macOS)
+- name: Check if tailscaled (formula) is already installed
+  ansible.builtin.command: /opt/homebrew/bin/tailscale version
+  register: tailscale_formula_check
+  changed_when: false
+  failed_when: false
+
+- name: Check if Tailscale GUI app exists (conflict check)
   ansible.builtin.stat:
     path: /Applications/Tailscale.app
-  register: tailscale_app_macos
+  register: tailscale_gui_app
 
-- name: Install Tailscale via Homebrew Cask (macOS)
-  community.general.homebrew_cask:
+- name: Warn if GUI Tailscale app is installed
+  ansible.builtin.debug:
+    msg: |
+      ⚠️  Tailscale GUI app detected at /Applications/Tailscale.app
+      The GUI app conflicts with the open-source tailscaled daemon.
+      Remove it before proceeding:
+        rm -rf /Applications/Tailscale.app
+        sudo rm -rf /Library/SystemExtensions/com.tailscale.ipn.macsys.network-extension.systemextension
+      Then empty Trash and reboot.
+  when: tailscale_gui_app.stat.exists
+
+- name: Fail if GUI Tailscale app conflicts with tailscaled
+  ansible.builtin.fail:
+    msg: "Cannot install tailscaled while Tailscale.app is present. Remove /Applications/Tailscale.app first."
+  when: tailscale_gui_app.stat.exists
+
+- name: Install tailscaled via Homebrew formula (open-source variant)
+  community.general.homebrew:
     name: tailscale
     state: present
   become: false
   environment:
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
-  when: not tailscale_app_macos.stat.exists
+  when: tailscale_formula_check.rc != 0
 
-- name: Check if Tailscale is running (macOS)
-  ansible.builtin.command: /Applications/Tailscale.app/Contents/MacOS/Tailscale status --json
+- name: Start tailscaled as a system service
+  ansible.builtin.command: brew services start tailscale
+  become: true
+  environment:
+    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
+  changed_when: true
+  failed_when: false
+
+- name: Wait for tailscaled to be ready
+  ansible.builtin.command: tailscale status --json
+  environment:
+    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   register: tailscale_status_macos
   changed_when: false
   failed_when: false
+  retries: 5
+  delay: 2
+  until: tailscale_status_macos.rc == 0
 
-- name: Display Tailscale setup instructions (macOS)
+- name: Connect to Tailnet with auth key (unattended)
+  ansible.builtin.command: >
+    tailscale up
+    --ssh
+    --authkey={{ tailscale_authkey }}
+    --hostname={{ tailscale_hostname | default(ansible_hostname) }}
+  environment:
+    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
+  become: true
+  when: tailscale_authkey | length > 0
+  no_log: true
+  changed_when: true
+
+- name: Enable Tailscale SSH (if already connected without auth key)
+  ansible.builtin.command: tailscale set --ssh
+  environment:
+    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
+  become: true
+  changed_when: true
+  failed_when: false
+  when: tailscale_authkey | length == 0
+
+- name: Display Tailscale setup instructions
   ansible.builtin.debug:
     msg:
       - "============================================"
-      - "Tailscale installed on macOS"
+      - "Tailscale (open-source tailscaled) installed"
       - "============================================"
       - ""
+      - "This is the CLI-only variant with full feature support:"
+      - "  ✓ Tailscale SSH server (no SSH keys needed)"
+      - "  ✓ Tailscale Funnel (stable public URLs)"
+      - "  ✓ Runs before login (headless safe)"
+      - ""
       - "To connect this Mac to your Tailnet:"
+      - "  sudo tailscale up --ssh"
       - ""
-      - "Option 1 - GUI:"
-      - "  1. Open Tailscale from Applications"
-      - "  2. Click 'Log in' and follow the web flow"
+      - "With auth key (unattended):"
+      - "  sudo tailscale up --ssh --authkey tskey-auth-xxxxx"
       - ""
-      - "Option 2 - CLI:"
-      - "  sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale up"
+      - "To expose OpenClaw dashboard to your tailnet:"
+      - "  tailscale serve --bg 18789"
       - ""
-      - "With auth key:"
-      - "  sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale up --authkey tskey-auth-xxxxx"
+      - "To expose a port publicly (e.g. for Twilio webhooks):"
+      - "  tailscale funnel --bg 3334"
       - ""
       - "Get auth key from: https://login.tailscale.com/admin/settings/keys"
-  when: tailscale_status_macos.rc != 0
+  when: tailscale_authkey | length == 0

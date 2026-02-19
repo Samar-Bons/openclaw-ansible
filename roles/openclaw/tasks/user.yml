@@ -158,7 +158,8 @@
       {{ openclaw_user }} ALL=(ALL) NOPASSWD: /bin/launchctl stop *
       {{ openclaw_user }} ALL=(ALL) NOPASSWD: /bin/launchctl list *
       {{ openclaw_user }} ALL=(ALL) NOPASSWD: /usr/libexec/ApplicationFirewall/socketfilterfw *
-      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /Applications/Tailscale.app/Contents/MacOS/Tailscale *
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /opt/homebrew/bin/tailscale *
+      {{ openclaw_user }} ALL=(ALL) NOPASSWD: /opt/homebrew/bin/tailscaled *
     validate: /usr/sbin/visudo -cf %s
   when: ansible_os_family == 'Darwin'
 
