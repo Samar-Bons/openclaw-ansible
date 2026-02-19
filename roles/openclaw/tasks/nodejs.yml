@@ -71,6 +71,9 @@
 # Common: pnpm installation
 - name: Check if pnpm is already installed
   ansible.builtin.command: pnpm --version
+  become: "{{ false if ansible_os_family == 'Darwin' else true }}"
+  environment:
+    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   register: pnpm_check
   failed_when: false
   changed_when: false
@@ -84,11 +87,17 @@
 
 - name: Verify Node.js installation
   ansible.builtin.command: node --version
+  become: "{{ false if ansible_os_family == 'Darwin' else true }}"
+  environment:
+    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   register: node_version
   changed_when: false
 
 - name: Verify pnpm installation
   ansible.builtin.command: pnpm --version
+  become: "{{ false if ansible_os_family == 'Darwin' else true }}"
+  environment:
+    PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   register: pnpm_version
   changed_when: false
 

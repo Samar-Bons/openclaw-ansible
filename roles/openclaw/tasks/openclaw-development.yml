@@ -107,7 +107,7 @@
 - name: Verify openclaw installation from development build
   ansible.builtin.shell:
     cmd: openclaw --version
-    executable: /bin/bash
+    executable: "{{ '/bin/zsh' if ansible_os_family == 'Darwin' else '/bin/bash' }}"
   become: true
   become_user: "{{ openclaw_user }}"
   environment:

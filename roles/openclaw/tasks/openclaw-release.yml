@@ -4,7 +4,7 @@
 - name: Install OpenClaw globally as openclaw user (using pnpm)
   ansible.builtin.shell:
     cmd: pnpm install -g openclaw@latest
-    executable: /bin/bash
+    executable: "{{ '/bin/zsh' if ansible_os_family == 'Darwin' else '/bin/bash' }}"
   become: true
   become_user: "{{ openclaw_user }}"
   environment:

@@ -59,6 +59,9 @@
     executable: "{{ '/bin/zsh' if ansible_os_family == 'Darwin' else '/bin/bash' }}"
   become: true
   become_user: "{{ openclaw_user }}"
+  environment:
+    PATH: "/opt/homebrew/bin:{{ openclaw_home }}/.local/bin:{{ openclaw_home }}/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin"
+    HOME: "{{ openclaw_home }}"
   register: pnpm_config_result
   changed_when: pnpm_config_result.rc == 1
   failed_when: pnpm_config_result.rc > 1
