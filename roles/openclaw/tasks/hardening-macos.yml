@@ -52,10 +52,13 @@
   when: macos_disable_bluetooth | default(true) | bool
 
 # Remote Access
+# systemsetup -setremotelogin requires Full Disk Access on modern macOS,
+# so we use launchctl to enable the SSH daemon directly.
 - name: Enable SSH (Remote Login)
-  ansible.builtin.command: systemsetup -f -setremotelogin on
+  ansible.builtin.command: launchctl load -w /System/Library/LaunchDaemons/ssh.plist
   become: true
   changed_when: true
+  failed_when: false
 
 # Disable macOS auto-updates (BlueBubbles can break on API changes)
 - name: Disable automatic macOS updates
