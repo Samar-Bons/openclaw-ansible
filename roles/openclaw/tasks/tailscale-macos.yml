@@ -74,19 +74,19 @@
   changed_when: true
 
 - name: Wait for tailscaled to be ready
-  ansible.builtin.command: tailscale status --json
+  ansible.builtin.command: tailscale --socket=/var/run/tailscale/tailscaled.sock status --json
   environment:
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   register: tailscale_status_macos
   changed_when: false
   failed_when: false
-  retries: 10
-  delay: 3
+  retries: 15
+  delay: 5
   until: tailscale_status_macos.rc == 0
 
 - name: Connect to Tailnet with auth key (unattended)
   ansible.builtin.command: >
-    tailscale up
+    tailscale --socket=/var/run/tailscale/tailscaled.sock up
     --ssh
     --authkey={{ tailscale_authkey }}
     --hostname={{ tailscale_hostname | default(ansible_hostname) }}
@@ -98,7 +98,7 @@
   changed_when: true
 
 - name: Connect to Tailnet interactively (no auth key)
-  ansible.builtin.command: tailscale up --ssh
+  ansible.builtin.command: tailscale --socket=/var/run/tailscale/tailscaled.sock up --ssh
   environment:
     PATH: "/opt/homebrew/bin:{{ ansible_env.PATH }}"
   become: true
