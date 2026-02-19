@@ -4,6 +4,11 @@ set -e
 # OpenClaw Ansible Installer
 # This script installs Ansible if needed and runs the OpenClaw playbook
 
+# Wrap in main() so the entire script is downloaded before execution.
+# Without this, `curl | bash` can lose the script stream when commands
+# like `brew install` read from stdin.
+main() {
+
 # Enable 256 colors
 export TERM=xterm-256color
 
@@ -75,7 +80,7 @@ else
     ANSIBLE_EXTRA_VARS="--ask-become-pass"
 fi
 
-echo -e "${GREEN}[1/4] Checking prerequisites...${NC}"
+echo -e "${GREEN}[1/5] Checking prerequisites...${NC}"
 
 # Check if Ansible is installed
 if ! command -v ansible-playbook &> /dev/null; then
@@ -120,3 +125,8 @@ cd /
 rm -rf "$TEMP_DIR"
 
 # run-playbook.sh will display instructions to switch to openclaw user
+
+}
+
+# Run main after the entire script has been read
+main "$@"
